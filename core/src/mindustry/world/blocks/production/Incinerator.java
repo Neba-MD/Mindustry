@@ -28,12 +28,12 @@ public class Incinerator extends Block{
 
         @Override
         public void updateTile(){
-            heat = Mathf.approachDelta(heat, consValid() && efficiency() > 0.9f ? 1f : 0f, 0.04f);
+            heat = Mathf.approachDelta(heat, efficiency, 0.04f);
         }
 
         @Override
         public BlockStatus status(){
-            return heat > 0.5f ? BlockStatus.active : BlockStatus.noInput;
+            return !enabled ? BlockStatus.logicDisable : heat > 0.5f ? BlockStatus.active : BlockStatus.noInput;
         }
 
         @Override
@@ -76,7 +76,7 @@ public class Incinerator extends Block{
 
         @Override
         public boolean acceptLiquid(Building source, Liquid liquid){
-            return heat > 0.5f;
+            return heat > 0.5f && liquid.incinerable;
         }
     }
 }

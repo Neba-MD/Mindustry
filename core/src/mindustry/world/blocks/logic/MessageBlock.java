@@ -1,6 +1,8 @@
 package mindustry.world.blocks.logic;
 
 import arc.*;
+import arc.Graphics.*;
+import arc.Graphics.Cursor.*;
 import arc.Input.*;
 import arc.graphics.*;
 import arc.graphics.g2d.*;
@@ -10,7 +12,9 @@ import arc.scene.ui.layout.*;
 import arc.util.*;
 import arc.util.io.*;
 import arc.util.pooling.*;
+import mindustry.core.*;
 import mindustry.gen.*;
+import mindustry.logic.*;
 import mindustry.ui.*;
 import mindustry.ui.dialogs.*;
 import mindustry.world.*;
@@ -33,7 +37,7 @@ public class MessageBlock extends Block{
         envEnabled = Env.any;
 
         config(String.class, (MessageBuild tile, String text) -> {
-            if(text.length() > maxTextLength){
+            if(text.length() > maxTextLength || !accessible()){
                 return; //no.
             }
 
@@ -55,12 +59,21 @@ public class MessageBlock extends Block{
         });
     }
 
-    public class MessageBuild extends Building{
+    public boolean accessible(){
+        return !privileged || state.rules.editor || state.rules.allowEditWorldProcessors;
+    }
+
+    @Override
+    public boolean canBreak(Tile tile){
+        return accessible();
+    }
+
+    public class MessageBuild extends Building implements LReadable{
         public StringBuilder message = new StringBuilder();
 
         @Override
         public void drawSelect(){
-            if(renderer.pixelator.enabled()) return;
+            if(renderer.pixelate) return;
 
             Font font = Fonts.outline;
             GlyphLayout l = Pools.obtain(GlyphLayout.class, GlyphLayout::new);
@@ -68,7 +81,7 @@ public class MessageBlock extends Block{
             font.getData().setScale(1 / 4f / Scl.scl(1f));
             font.setUseIntegerPositions(false);
 
-            CharSequence text = message == null || message.length() == 0 ? "[lightgray]" + Core.bundle.get("empty") : message;
+            String text = message == null || message.length() == 0 ? "[lightgray]" + Core.bundle.get("empty") : UI.formatIcons(message.toString());
 
             l.setText(font, text, Color.white, 90f, Align.left, true);
             float offset = 1f;
@@ -76,7 +89,7 @@ public class MessageBlock extends Block{
             Draw.color(0f, 0f, 0f, 0.2f);
             Fill.rect(x, y - tilesize/2f - l.height/2f - offset, l.width + offset*2f, l.height + offset*2f);
             Draw.color();
-            font.setColor(Color.white);
+            font.setColor(message.length() == 0 ? Color.lightGray : Color.white);
             font.draw(text, x - l.width/2f, y - tilesize/2f - offset, 90f, Align.left, true);
             font.setUseIntegerPositions(ints);
 
@@ -86,11 +99,17 @@ public class MessageBlock extends Block{
         }
 
         @Override
+        public boolean shouldShowConfigure(Player player){
+            return accessible();
+        }
+
+        @Override
         public void buildConfiguration(Table table){
-            table.button(Icon.pencil, () -> {
+            table.button(Icon.pencil, Styles.cleari, () -> {
                 if(mobile){
+                    var contents = this.message.toString();
                     Core.input.getTextInput(new TextInput(){{
-                        text = message.toString();
+                        text = contents;
                         multiline = true;
                         maxLength = maxTextLength;
                         accepted = str -> {
@@ -114,6 +133,8 @@ public class MessageBlock extends Block{
                         return true;
                     });
                     a.setMaxLength(maxTextLength);
+                    dialog.cont.row();
+                    dialog.cont.label(() -> a.getText().length() + " / " + maxTextLength).color(Color.lightGray);
                     dialog.buttons.button("@ok", () -> {
                         if(!a.getText().equals(message.toString())) configure(a.getText());
                         dialog.hide();
@@ -123,10 +144,61 @@ public class MessageBlock extends Block{
                             dialog.hide();
                         }
                     });
+                    dialog.closeOnBack();
                     dialog.show();
                 }
                 deselect();
             }).size(40f);
+        }
+
+        @Override
+        public boolean onConfigureBuildTapped(Building other){
+            if(this == other || !accessible()){
+                deselect();
+                return false;
+            }
+
+            return true;
+        }
+
+        @Override
+        public Cursor getCursor(){
+            return !accessible() ? SystemCursor.arrow : super.getCursor();
+        }
+
+        @Override
+        public boolean readable(LExecutor exec){
+            return isValid();
+        }
+
+        @Override
+        public void read(LVar position, LVar output){
+            int address = position.numi();
+            output.setnum(address < 0 || address >= message.length() ? Double.NaN : message.charAt(address));
+        }
+
+        @Override
+        public double sense(LAccess sensor){
+            return switch(sensor){
+                case bufferSize -> message.length();
+                default -> super.sense(sensor);
+            };
+        }
+
+        @Override
+        public void damage(float damage){
+            if(privileged) return;
+            super.damage(damage);
+        }
+
+        @Override
+        public boolean canPickup(){
+            return false;
+        }
+
+        @Override
+        public boolean collide(Bullet other){
+            return !privileged;
         }
 
         @Override

@@ -1,13 +1,13 @@
 package mindustry.game;
 
+import arc.func.*;
 import arc.struct.*;
 import arc.util.*;
 import arc.util.serialization.*;
 import arc.util.serialization.Json.*;
 import mindustry.content.*;
-import mindustry.ctype.*;
 import mindustry.gen.*;
-import mindustry.io.legacy.*;
+import mindustry.io.versions.*;
 import mindustry.type.*;
 
 import java.util.*;
@@ -48,6 +48,8 @@ public class SpawnGroup implements JsonSerializable, Cloneable{
     public @Nullable StatusEffect effect;
     /** Items this unit spawns with. Null to disable. */
     public @Nullable ItemStack items;
+    /** Team that units spawned use. Null for default wave team. */
+    public @Nullable Team team;
 
     public SpawnGroup(UnitType type){
         this.type = type;
@@ -75,12 +77,9 @@ public class SpawnGroup implements JsonSerializable, Cloneable{
         return Math.max(shields + shieldScaling*(wave - begin), 0);
     }
 
-    /**
-     * Creates a unit, and assigns correct values based on this group's data.
-     * This method does not add() the unit.
-     */
-    public Unit createUnit(Team team, int wave){
-        Unit unit = type.create(team);
+    /** Creates a unit, and assigns correct values based on this group's data. */
+    public Unit createUnit(Team team, float x, float y, float rotation, int wave, Cons<Unit> cons){
+        Unit unit = type.spawn(team, x, y, rotation, cons);
 
         if(effect != null){
             unit.apply(effect, 999999f);
@@ -104,6 +103,11 @@ public class SpawnGroup implements JsonSerializable, Cloneable{
         return unit;
     }
 
+    /** Creates a unit, and assigns correct values based on this group's data. */
+    public Unit createUnit(Team team, int wave){
+        return createUnit(team, 0f, 0f, 0f, wave, u -> {});
+    }
+
     @Override
     public void write(Json json){
         if(type == null) type = UnitTypes.dagger;
@@ -118,17 +122,17 @@ public class SpawnGroup implements JsonSerializable, Cloneable{
         if(unitAmount != 1) json.writeValue("amount", unitAmount);
         if(effect != null) json.writeValue("effect", effect.name);
         if(spawn != -1) json.writeValue("spawn", spawn);
-        if(payloads != null && payloads.size > 0){
-            json.writeValue("payloads", payloads.map(u -> u.name).toArray(String.class));
-        }
+        if(payloads != null && payloads.any()) json.writeValue("payloads", payloads.map(u -> u.name).toArray(String.class));
+        if(items != null && items.amount > 0) json.writeValue("items", items);
+        if(team != null) json.writeValue("team", team.id);
     }
 
     @Override
     public void read(Json json, JsonValue data){
         String tname = data.getString("type", "dagger");
 
-        type = content.getByName(ContentType.unit, LegacyIO.unitMap.get(tname, tname));
-        if(type == null) type = UnitTypes.dagger;
+        type = content.unit(LegacyIO.unitMap.get(tname, tname));
+        if(type == null || type.internal) type = UnitTypes.dagger;
         begin = data.getInt("begin", 0);
         end = data.getInt("end", never);
         spacing = data.getInt("spacing", 1);
@@ -138,15 +142,16 @@ public class SpawnGroup implements JsonSerializable, Cloneable{
         shieldScaling = data.getFloat("shieldScaling", 0);
         unitAmount = data.getInt("amount", 1);
         spawn = data.getInt("spawn", -1);
-        if(data.has("payloads")){
-            payloads = Seq.with(json.readValue(String[].class, data.get("payloads"))).map(s -> content.getByName(ContentType.unit, s));
-        }
+        if(data.has("payloads")) payloads = Seq.with(json.readValue(String[].class, data.get("payloads"))).map(content::unit).removeAll(t -> t == null);
+        if(data.has("items")) items = json.readValue(ItemStack.class, data.get("items"));
+        if(data.has("team")) team = Team.get(data.getInt("team"));
+
 
         //old boss effect ID
         if(data.has("effect") && data.get("effect").isNumber() && data.getInt("effect", -1) == 8){
             effect = StatusEffects.boss;
         }else{
-            effect = content.getByName(ContentType.status, data.has("effect") && data.get("effect").isString() ? data.getString("effect", "none") : "none");
+            effect = content.statusEffect(data.has("effect") && data.get("effect").isString() ? data.getString("effect", "none") : "none");
         }
     }
 

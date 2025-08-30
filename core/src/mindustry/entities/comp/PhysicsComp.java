@@ -2,7 +2,6 @@ package mindustry.entities.comp;
 
 import arc.math.*;
 import arc.math.geom.*;
-import arc.util.*;
 import mindustry.annotations.Annotations.*;
 import mindustry.async.PhysicsProcess.*;
 import mindustry.gen.*;
@@ -11,7 +10,7 @@ import mindustry.gen.*;
  * Will bounce off of other objects that are at similar elevations.
  * Has mass.*/
 @Component
-abstract class PhysicsComp implements Velc, Hitboxc, Flyingc{
+abstract class PhysicsComp implements Velc, Hitboxc{
     @Import float hitSize, x, y;
     @Import Vec2 vel;
 

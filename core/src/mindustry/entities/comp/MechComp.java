@@ -1,21 +1,18 @@
 package mindustry.entities.comp;
 
-import arc.graphics.*;
 import arc.math.*;
 import arc.math.geom.*;
 import arc.util.*;
 import mindustry.annotations.Annotations.*;
-import mindustry.content.*;
 import mindustry.entities.*;
 import mindustry.gen.*;
 import mindustry.type.*;
-import mindustry.world.*;
 import mindustry.world.blocks.environment.*;
 
 import static mindustry.Vars.*;
 
 @Component
-abstract class MechComp implements Posc, Flyingc, Hitboxc, Unitc, Mechc, ElevationMovec{
+abstract class MechComp implements Posc, Hitboxc, Unitc, Mechc, ElevationMovec{
     @Import float x, y, hitSize;
     @Import UnitType type;
 
@@ -26,7 +23,7 @@ abstract class MechComp implements Posc, Flyingc, Hitboxc, Unitc, Mechc, Elevati
     @Override
     public void update(){
         //trigger animation only when walking manually
-        if(walked || net.client()){
+        if(walked || net.client() || isRemote()){
             float len = deltaLen();
             baseRotation = Angles.moveToward(baseRotation, deltaAngle(), type().baseRotateSpeed * Mathf.clamp(len / type().speed / Time.delta) * Time.delta);
             walkTime += len;
@@ -40,23 +37,19 @@ abstract class MechComp implements Posc, Flyingc, Hitboxc, Unitc, Mechc, Elevati
 
         float lastExtend = walkExtension;
 
-        if(extendScl < lastExtend && base % 2f > 1f && !isFlying()){
+        if(!headless && extendScl < lastExtend && base % 2f > 1f && !isFlying() && !inFogTo(player.team())){
             int side = -Mathf.sign(extend);
             float width = hitSize / 2f * side, length = type.mechStride * 1.35f;
 
             float cx = x + Angles.trnsx(baseRotation, length, width),
             cy = y + Angles.trnsy(baseRotation, length, width);
 
-            if(type.mechStepShake > 0){
-                Effect.shake(type.mechStepShake, type.mechStepShake, cx, cy);
+            if(type.stepShake > 0){
+                Effect.shake(type.stepShake, type.stepShake, cx, cy);
             }
 
             if(type.mechStepParticles){
-                Tile tile = world.tileWorld(cx, cy);
-                if(tile != null){
-                    Color color = tile.floor().mapColor;
-                    Fx.unitLand.at(cx, cy, hitSize/8f, color);
-                }
+                Effect.floorDust(cx, cy, hitSize/8f);
             }
         }
 
@@ -75,7 +68,7 @@ abstract class MechComp implements Posc, Flyingc, Hitboxc, Unitc, Mechc, Elevati
                 }
             }
         }
-        return canDrown() ? floorOn() : null;
+        return floorOn();
     }
 
     public float walkExtend(boolean scaled){

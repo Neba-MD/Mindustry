@@ -19,16 +19,11 @@ public class LParser{
     Seq<LStatement> statements = new Seq<>();
     char[] chars;
     int pos, line, tok;
+    boolean privileged;
 
-    LParser(String text){
+    LParser(String text, boolean privileged){
+        this.privileged = privileged;
         this.chars = text.toCharArray();
-    }
-
-    /** Parses a sequence of statements from a string. */
-    public static Seq<LStatement> parse(String text){
-        //don't waste time parsing null/empty text
-        if(text == null || text.isEmpty()) return new Seq<>();
-        return new LParser(text).parse();
     }
 
     void comment(){
@@ -138,8 +133,12 @@ public class LParser{
                 try{
                     st = LogicIO.read(tokens, tok);
                 }catch(Exception e){
-                    //log invalid statements
-                    Log.err(e);
+                    //replace invalid statements
+                    st = new InvalidStatement();
+                }
+
+                //discard misplaced privileged instructions
+                if(!privileged && st != null && st.privileged()){
                     st = new InvalidStatement();
                 }
 
@@ -153,7 +152,13 @@ public class LParser{
                 }else{
                     //attempt parsing using custom parser if a match is found; this is for mods
                     if(LAssembler.customParsers.containsKey(tokens[0])){
-                        statements.add(LAssembler.customParsers.get(tokens[0]).get(tokens));
+                        var parsed = LAssembler.customParsers.get(tokens[0]).get(tokens);
+
+                        if(!privileged && parsed != null && parsed.privileged()){
+                            statements.add(new InvalidStatement());
+                        }else{
+                            statements.add(parsed);
+                        }
                     }else{
                         //unparseable statement
                         statements.add(new InvalidStatement());

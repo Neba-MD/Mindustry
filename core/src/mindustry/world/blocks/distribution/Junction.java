@@ -12,14 +12,26 @@ import static mindustry.Vars.*;
 public class Junction extends Block{
     public float speed = 26; //frames taken to go through this junction
     public int capacity = 6;
+    public float displayedSpeed = 13f;
 
     public Junction(String name){
         super(name);
         update = true;
-        solid = true;
+        solid = false;
+        underBullets = true;
         group = BlockGroup.transportation;
         unloadable = false;
+        floating = true;
         noUpdateDisabled = true;
+    }
+
+    @Override
+    public void setStats(){
+        super.setStats();
+
+        //(60f / speed * capacity) returns 13.84 which is not the actual value (non linear, depends on fps)
+        stats.add(Stat.itemsMoved, displayedSpeed, StatUnit.itemsSecond);
+        stats.add(Stat.itemCapacity, capacity, StatUnit.items);
     }
 
     @Override
@@ -78,6 +90,11 @@ public class Junction extends Block{
         }
 
         @Override
+        public byte version(){
+            return 1;
+        }
+
+        @Override
         public void write(Writes write){
             super.write(write);
             buffer.write(write);
@@ -86,7 +103,7 @@ public class Junction extends Block{
         @Override
         public void read(Reads read, byte revision){
             super.read(read, revision);
-            buffer.read(read);
+            buffer.read(read, revision == 0);
         }
     }
 }

@@ -14,7 +14,8 @@ public class Router extends Block{
 
     public Router(String name){
         super(name);
-        solid = true;
+        solid = false;
+        underBullets = true;
         update = true;
         hasItems = true;
         itemCapacity = 1;
@@ -82,7 +83,7 @@ public class Router extends Block{
             items.add(item, 1);
             lastItem = item;
             time = 0f;
-            lastInput = source.tile();
+            lastInput = source.tile;
         }
 
         @Override
